@@ -24,9 +24,9 @@
 
 3) перейти в директорию проекта и запустить программу с желаемыми входными данными, для этого необходимо выполнить следующие команды:
 
-  $ cd app
-  $ python manage.py flush
- *введите yes  
+  $ cd app  
+  $ python manage.py flush  
+ *введите yes    
   $ python3 manage.py run_market <num_products> <num_warehouses> <num_clients>
 
 где <num_products> - количество товаров, <num_warehouses> - количество складов, <num_clients> - количество клиентов(итераций)

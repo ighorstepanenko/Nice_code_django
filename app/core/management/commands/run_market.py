@@ -7,7 +7,7 @@ from core.models import Product, Warehouse, Client, Distance, WarehouseProduct, 
 
 
 class Command(BaseCommand):
-    help = 'Runs the supply market and customer generation logic'
+    help: str = 'Runs the supply market and customer generation logic'
 
     def add_arguments(self, parser):
         parser.add_argument('num_products', type=int, help='Number of products to generate.')
@@ -57,56 +57,61 @@ class Command(BaseCommand):
                         'quantity': quantity
                     })
             print(f'Клиент: {client.name}\nТовары клиента: ', end='')
-            for product, quantity in client.products_in_use.through.objects.filter(client=client).values_list('product',
-                                                                                                              'quantity'):
+            for product, quantity in client.products_in_use.through.objects.filter(client=client).values_list(
+                    'product', 'quantity'
+            ):
                 print(f'{Product.objects.get(id=product).name}({quantity}шт.)', end=', ')
 
             # Generate distances
             for warehouse in warehouses:
-                distance = randint(1, 100)
+                distance: int = randint(1, 100)
                 Distance.objects.create(
                     client=client,
                     warehouse=warehouse,
                     distance=distance,
                 )
 
-            transport_tariff = 0.01
+            transport_tariff: float = 0.01
             products = client.products_in_use.all()
 
-            result_dict = {}
+            result_dict: dict[str, list[int, float, dict]] = {}
             for warehouse in warehouses:
-                products_in_result = {}
-                scores = 0
-                total_cost = 0
-                storage_limit = warehouse.storage_limit
+                products_in_result: dict[str, int] = {}
+                scores: int = 0
+                total_cost: float = 0.0
+                storage_limit: int = warehouse.storage_limit
                 for product in products:
                     if product not in warehouse.products.all():
                         continue
                     else:
                         if storage_limit != 0:
-                            product_to_store = min(ClientProduct.objects.get(client=client, product=product).quantity,
-                                                   storage_limit,
-                                                   WarehouseProduct.objects.get(warehouse=warehouse,
-                                                                                product=product).limit)
+                            product_to_store: int = min(
+                                ClientProduct.objects.get(client=client, product=product).quantity,
+                                storage_limit,
+                                WarehouseProduct.objects.get(warehouse=warehouse,
+                                                             product=product).limit)
                             scores += product_to_store
-                            total_cost += product_to_store * transport_tariff * Distance.objects.get(client=client,
-                                                                                                     warehouse=warehouse).distance + product_to_store * WarehouseProduct.objects.get(
+                            total_cost += product_to_store * transport_tariff * Distance.objects.get(
+                                client=client, warehouse=warehouse
+                            ).distance + product_to_store * WarehouseProduct.objects.get(
                                 warehouse=warehouse,
                                 product=product).tariff
                             storage_limit -= product_to_store
                             products_in_result[product.name] = product_to_store
                 result_dict[warehouse.name] = [scores, round(total_cost, 2), products_in_result]
-            most_convenient_offer_tuple = sorted(result_dict.items(), key=lambda x: (x[1][0], -x[1][1]), reverse=True)
-            most_convenient_offer_dict = dict(most_convenient_offer_tuple)
+            most_convenient_offer_tuple: list[tuple] = sorted(
+                result_dict.items(), key=lambda x: (x[1][0], -x[1][1]), reverse=True
+            )
+            most_convenient_offer_dict: dict = dict(most_convenient_offer_tuple)
 
-            cheapest_offer_tuple = sorted(result_dict.items(), key=lambda x: x[1][1])
-            cheapest_offer_dict = dict(cheapest_offer_tuple)
+            cheapest_offer_tuple: list[tuple] = sorted(result_dict.items(), key=lambda x: x[1][1])
+            cheapest_offer_dict: dict = dict(cheapest_offer_tuple)
 
-            products_dict = {}
+            products_dict: dict[str, int] = {}
             for product in products:
                 products_dict[product.name] = ClientProduct.objects.get(client=client, product=product).quantity
 
-            def testing(testing_dict: dict):
+            def testing(testing_dict: dict) -> list[dict]:
                 result = {}
                 product_dictionary = products_dict.copy()
                 for test_warehouse, test_value in testing_dict.items():
@@ -127,7 +132,8 @@ class Command(BaseCommand):
                             pre_result[test_warehouse][
                                 'Итоговая стоимость'] += storing * transport_tariff * Distance.objects.filter(
                                 client=client,
-                                warehouse__name=test_warehouse).first().distance + storing * WarehouseProduct.objects.filter(
+                                warehouse__name=test_warehouse
+                            ).first().distance + storing * WarehouseProduct.objects.filter(
                                 warehouse__name=test_warehouse,
                                 product__name=test_product).first().tariff
                             pre_result[test_warehouse]['Итоговая стоимость'] = round(
@@ -140,7 +146,7 @@ class Command(BaseCommand):
             most_convenient_offer, product_check1 = testing(most_convenient_offer_dict)
             cheapest_offer, product_check2 = testing(cheapest_offer_dict)
 
-            def print_result(dictionary: dict, prod_check: dict):
+            def print_result(dictionary: dict):
                 cost = []
                 for ware, ware_result in dictionary.items():
                     self.stdout.write(f'{ware}: ')
@@ -151,9 +157,9 @@ class Command(BaseCommand):
                 self.stdout.write(f'Стоимость за всю транспортировку: {sum(cost)}у.е')
 
             self.stdout.write(f'\nСамый удобный вариант:')
-            print_result(most_convenient_offer, product_check1)
+            print_result(most_convenient_offer)
             self.stdout.write(f'\nСамый дешёвый вариант:')
-            print_result(cheapest_offer, product_check2)
+            print_result(cheapest_offer)
 
             for checked_product, value in product_check1.items():
                 if value != 0:

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ "$DATABASE" = "postgres" ]
+if [ "$POSTGRES_DB" = "nicecode" ]
 then
     # если база еще не запущена
     echo "DB not yet run..."
@@ -13,8 +13,9 @@ then
     echo "DB did run."
 fi
 # Удаляем все старые данные
-python manage.py flush --no-input
+python3 manage.py flush --no-input
 # Выполняем миграции
-python manage.py migrate
+python3 manage.py makemigrations
+python3 manage.py migrate
 
 exec "$@"

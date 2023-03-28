@@ -3,6 +3,8 @@ from django.db.models import F
 
 from core.logic import *
 
+from core.models import Transaction, TransactionProduct
+
 
 class Command(BaseCommand):
     help: str = 'Runs the supply market and customer generation logic'
@@ -67,18 +69,29 @@ class Command(BaseCommand):
             for checked_product, value in product_check1.items():
                 if value != 0:
                     self.stdout.write(f'Для товара {checked_product} не удалось найти вариант хранения, {value}шт.')
-
+            
             if randint(0, 1) == 1:
                 self.stdout.write(f'\nВыбран удобный вариант\n\n')
                 transaction = most_convenient_offer
             else:
                 self.stdout.write(f'\nВыбран дешёвый вариант\n\n')
-                transaction = cheapest_offer
-
+                transaction = cheapest_offer	
+	
             for updated_warehouse in transaction.keys():
                 updated_products = transaction[updated_warehouse]['Товары']
+                stored_products = sum([int(i[:-3]) for i in updated_products.values()])
+                trans = Transaction.objects.create(client=client,
+                                                   warehouse=Warehouse.objects.get(name=updated_warehouse),
+                                                   quantity=stored_products,
+                                                   total_price=transaction[updated_warehouse]['Итоговая стоимость'])
                 Warehouse.objects.filter(name=updated_warehouse).update(
-                    storage_limit=F('storage_limit') - sum([int(i[:-3]) for i in updated_products.values()]))
+                    storage_limit=F('storage_limit') - stored_products)
                 for product in updated_products.keys():
+                    quant = int(updated_products[product][:-3])
+                    TransactionProduct.objects.create(transaction=trans, product=Product.objects.get(name=product),
+                                                      quantity=quant,
+                                                      price=WarehouseProduct.objects.get(
+                                                          warehouse__name=updated_warehouse,
+                                                          product__name=product).tariff)
                     WarehouseProduct.objects.filter(warehouse__name=updated_warehouse, product__name=product).update(
-                        limit=F('limit') - int(updated_products[product][:-3]))
+                        limit=F('limit') - quant)

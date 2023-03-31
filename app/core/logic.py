@@ -1,9 +1,10 @@
 from random import randint, uniform
 from typing import List, Dict, Union
+from django.db.models import F
 
 from django.db.models import QuerySet
 
-from core.models import Product, Warehouse, Client, Distance, WarehouseProduct, ClientProduct
+from core.models import *
 
 
 class ProductGenerator:
@@ -140,4 +141,36 @@ class Testing:
                 result.update(pre_result)
         print(product_dictionary)
         return [result, product_dictionary]
+
+class TransactionHandler:
+    @staticmethod
+    def create_transaction(client, warehouse, stored_products, total_price, updated_products):
+        trans = Transaction.objects.create(client=client, warehouse=warehouse, quantity=stored_products, total_price=total_price)
+        for product in updated_products.keys():
+            quant = int(updated_products[product][:-3])
+            TransactionProductHandler.create_transaction_product(trans, product, quant)
+            WarehouseProductHandler.update_warehouse_product(warehouse, product, quant)
+        WarehouseHandler.update_warehouse_limit(warehouse, stored_products)
+
+class WarehouseHandler:
+    @staticmethod
+    def update_warehouse_limit(warehouse, stored_products):
+        Warehouse.objects.filter(name=warehouse.name).update(storage_limit=F('storage_limit') - stored_products)
+
+class TransactionProductHandler:
+    @staticmethod
+    def create_transaction_product(transaction, product_name, quantity):
+        product = Product.objects.get(name=product_name)
+        tariff = WarehouseProductHandler.get_warehouse_product_tariff(transaction.warehouse, product)
+        TransactionProduct.objects.create(transaction=transaction, product=product, quantity=quantity, price=tariff)
+
+class WarehouseProductHandler:
+    @staticmethod
+    def get_warehouse_product_tariff(warehouse, product):
+        return WarehouseProduct.objects.get(warehouse=warehouse, product=product).tariff
+
+    @staticmethod
+    def update_warehouse_product(warehouse, product_name, quantity):
+        WarehouseProduct.objects.filter(warehouse=warehouse, product__name=product_name).update(limit=F('limit') - quantity)
+
 

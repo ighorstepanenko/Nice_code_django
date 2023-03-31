@@ -1,9 +1,6 @@
 from django.core.management import BaseCommand
-from django.db.models import F
 
 from core.logic import *
-
-from core.models import Transaction, TransactionProduct
 
 
 class Command(BaseCommand):
@@ -76,22 +73,11 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f'\nВыбран дешёвый вариант\n\n')
                 transaction = cheapest_offer	
-	
+
             for updated_warehouse in transaction.keys():
+                warehouse = Warehouse.objects.get(name=updated_warehouse)
                 updated_products = transaction[updated_warehouse]['Товары']
                 stored_products = sum([int(i[:-3]) for i in updated_products.values()])
-                trans = Transaction.objects.create(client=client,
-                                                   warehouse=Warehouse.objects.get(name=updated_warehouse),
-                                                   quantity=stored_products,
-                                                   total_price=transaction[updated_warehouse]['Итоговая стоимость'])
-                Warehouse.objects.filter(name=updated_warehouse).update(
-                    storage_limit=F('storage_limit') - stored_products)
-                for product in updated_products.keys():
-                    quant = int(updated_products[product][:-3])
-                    TransactionProduct.objects.create(transaction=trans, product=Product.objects.get(name=product),
-                                                      quantity=quant,
-                                                      price=WarehouseProduct.objects.get(
-                                                          warehouse__name=updated_warehouse,
-                                                          product__name=product).tariff)
-                    WarehouseProduct.objects.filter(warehouse__name=updated_warehouse, product__name=product).update(
-                        limit=F('limit') - quant)
+                TransactionHandler.create_transaction(client, warehouse, stored_products,
+                                                      transaction[updated_warehouse]['Итоговая стоимость'],
+                                                      updated_products)
